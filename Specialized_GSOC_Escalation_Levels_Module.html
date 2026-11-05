@@ -1,0 +1,981 @@
+<title>GSOC Escalation Levels</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: console shell. Section rail on the left, one working page at a time on the right.
+   Dark by design, to match the GSOC TRN module set. The six levels are a switchboard, not a ladder:
+   channels that light up together. Level 5 takes SBAR red because it is the emergency channel. */
+:root{
+  color-scheme: dark;
+  /* Specialized core palette, Brand Guidelines v1.0 */
+  --prism:#512FFF;
+  --prism-dark:#3F1DF8;
+  --prism-deep:#190935;
+  --frost:#E8EAEF;
+  --shark:#92989B;
+  --sbar:#C0332B;
+  /* console surfaces */
+  --ink:#05060A;
+  --panel:#0E1017;
+  --panel-2:#151824;
+  --panel-3:#1D2130;
+  --line:#262A35;
+  --line-soft:#171A22;
+  --prism-soft:rgba(81,47,255,.14);
+  --prism-line:#3A2F8A;
+  --prism-lift:#A592FF;
+  /* operational state */
+  --good:#4FB286;
+  --good-soft:rgba(79,178,134,.11);
+  --bad:#E06464;
+  --bad-soft:rgba(214,69,69,.11);
+  --amber:#E0A93B;
+  /* type */
+  --display:'Archivo','Termina',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --sans:'Public Sans','General Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--ink);scroll-padding-top:calc(env(safe-area-inset-top,0px) + 96px)}
+body{margin:0;background:var(--ink);color:var(--frost);font-family:var(--sans);font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--ink)}
+body.dragging{cursor:grabbing;user-select:none;-webkit-user-select:none}
+a{color:var(--prism-lift)}
+:focus-visible{outline:2px solid var(--prism-lift);outline-offset:2px}
+button{font:inherit;color:inherit}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- brand devices ---------- */
+.wordmark{font-family:var(--display);font-stretch:125%;font-weight:600;letter-spacing:.3em;text-transform:uppercase;font-size:11.5px;color:var(--prism-lift);white-space:nowrap}
+.wordmark.frost{color:var(--frost)}
+.trio{width:16px;height:15px;flex:0 0 auto;color:var(--prism)}
+.trio path{stroke:currentColor}
+.cropmark{position:fixed;right:-58px;bottom:-58px;width:250px;height:230px;z-index:0;color:var(--prism);opacity:.06;pointer-events:none}
+.brandbar{display:flex;height:3px;margin:0 0 16px;border-radius:2px;overflow:hidden;max-width:220px}
+.brandbar i{display:block;height:3px}
+.brandbar i:nth-child(1){width:14%;background:#000;border-top:1px solid var(--line)}
+.brandbar i:nth-child(2){width:26%;background:var(--frost)}
+.brandbar i:nth-child(3){width:60%;background:var(--prism)}
+
+/* ---------- chrome ---------- */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding-block:11px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));
+  background:rgba(5,6,10,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(9px)}
+.docid{font-family:var(--mono);font-size:10.5px;color:var(--shark);letter-spacing:.09em;text-transform:uppercase;min-width:0}
+.clock{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--frost);display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--good);animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(79,178,134,.45)}70%{box-shadow:0 0 0 7px rgba(79,178,134,0)}100%{box-shadow:0 0 0 0 rgba(79,178,134,0)}}
+.progbar{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:linear-gradient(90deg,var(--prism-deep),var(--prism));transition:width .4s ease}
+.shell{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh;position:relative;z-index:1}
+.rail{border-right:1px solid var(--line);padding:18px 0 70px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 46px);height:calc(100vh - 46px);overflow:auto}
+.railgroup{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--prism-lift);padding:16px 18px 6px;border-top:1px solid var(--line-soft);margin-top:6px}
+.railgroup:first-child{border-top:0;margin-top:0;padding-top:4px}
+.navitem{display:flex;gap:10px;align-items:baseline;width:100%;text-align:left;background:none;border:0;border-left:2px solid transparent;color:var(--shark);font-size:13px;padding:7px 18px;cursor:pointer;line-height:1.35}
+.navitem:hover{color:var(--frost);background:var(--panel)}
+.navitem.on{color:var(--frost);border-left-color:var(--prism);background:var(--prism-soft)}
+.navitem .n{font-family:var(--mono);font-size:10px;color:var(--prism-lift);min-width:20px}
+.navitem.done .n::after{content:" \2713";color:var(--good)}
+main{padding-block:30px 120px;padding-left:max(34px,env(safe-area-inset-left,0px));padding-right:max(34px,env(safe-area-inset-right,0px));max-width:920px;position:relative;z-index:1;min-width:0}
+
+/* ---------- type ---------- */
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--prism-lift);margin:0 0 10px}
+h1{font-family:var(--display);font-stretch:125%;font-size:clamp(24px,4vw,36px);line-height:1.05;margin:0 0 14px;text-transform:uppercase;letter-spacing:.01em;font-weight:700;text-wrap:balance}
+h2{font-family:var(--display);font-stretch:118%;font-size:15px;margin:38px 0 12px;text-transform:uppercase;letter-spacing:.12em;font-weight:600;padding-top:14px;border-top:1px solid var(--line);text-wrap:balance}
+h3{font-family:var(--sans);font-size:12.5px;margin:0 0 8px;letter-spacing:.14em;text-transform:uppercase;color:var(--shark);font-weight:600}
+.subline{font-size:15.5px;line-height:1.5;margin:0 0 18px;max-width:64ch}
+p{margin:0 0 12px;max-width:68ch}
+ul,ol{margin:0 0 12px;padding-left:22px;max-width:66ch}
+li{margin:0 0 6px}
+b,strong{font-weight:600}
+.mono{font-family:var(--mono);font-size:12.5px}
+.small{font-size:13px}
+.muted{color:var(--shark)}
+.sopref{font-family:var(--mono);font-size:11px;color:var(--frost);background:var(--panel-2);border:1px solid var(--line);padding:1px 7px;border-radius:3px;white-space:nowrap}
+.confirm{font-family:var(--mono);font-size:11px;color:var(--amber);background:rgba(224,169,59,.08);border:1px dashed #5A4620;padding:1px 6px;border-radius:3px;display:inline-block;line-height:1.5}
+
+/* ---------- level badges ---------- */
+.lv{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;padding:2px 8px;border-radius:3px;white-space:nowrap;line-height:1.6;border:1px solid transparent}
+.lv.l1{border-color:var(--shark);color:var(--frost)}
+.lv.l2{border-color:var(--frost);color:var(--frost);background:rgba(232,234,239,.08)}
+.lv.l3{background:var(--prism);border-color:var(--prism);color:#fff}
+.lv.l4{border-color:var(--prism-lift);color:var(--prism-lift);background:var(--prism-soft)}
+.lv.l5{background:var(--sbar);border-color:var(--sbar);color:#fff}
+.lv.l6{background:linear-gradient(110deg,#000 0%,var(--prism-deep) 42%,var(--prism) 100%);border-color:var(--prism-lift);color:#fff}
+
+/* ---------- cover ---------- */
+.cover{position:relative;overflow:hidden;border:1px solid var(--prism-line);border-radius:8px;background:linear-gradient(118deg,#000 0%,var(--prism-deep) 46%,var(--prism-dark) 90%,var(--prism) 115%);padding:28px 30px 24px;margin:0 0 20px}
+.cover .covermark{position:absolute;right:-40px;top:-44px;width:190px;height:175px;color:#fff;opacity:.15}
+.cover h1{margin:14px 0 10px;font-size:clamp(28px,5.6vw,46px)}
+.cover .tag{font-size:14.5px;color:#DDD7FF;margin:0;max-width:52ch}
+.cover .kv{font-family:var(--mono);font-size:11px;color:#CFC8FF;letter-spacing:.05em;margin:0}
+.cover .eyebrow{color:#CFC8FF;margin:12px 0 0}
+.rule{height:1px;background:rgba(255,255,255,.22);margin:18px 0 12px;max-width:320px}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:0 0 20px}
+.stat{background:var(--panel);padding:14px 16px}
+.stat b{display:block;font-family:var(--display);font-stretch:125%;font-weight:700;font-size:26px;line-height:1;color:var(--frost);font-variant-numeric:tabular-nums}
+.stat span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--shark);margin-top:8px}
+
+/* ---------- blocks ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px 20px;margin:0 0 18px;min-width:0}
+.takeaway{background:linear-gradient(180deg,rgba(81,47,255,.12),rgba(81,47,255,.02));border-color:var(--prism-line)}
+.takeaway h3{color:var(--prism-lift)}
+.bigline{font-family:var(--display);font-stretch:112%;font-weight:600;font-size:clamp(17px,2.4vw,21px);line-height:1.3;margin:0 0 12px;max-width:40ch;text-wrap:balance}
+.ctrl{border:1px solid var(--prism-line);border-left:3px solid var(--prism);border-radius:5px;background:linear-gradient(180deg,rgba(81,47,255,.09),rgba(81,47,255,.015));padding:13px 16px;margin:0 0 14px}
+.ctrl.red{border-color:#5A2420;border-left-color:var(--sbar);background:linear-gradient(180deg,rgba(192,51,43,.12),rgba(192,51,43,.02))}
+.ctrl .lab{font-family:var(--display);font-stretch:125%;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--prism-lift);display:block;margin-bottom:5px;font-weight:600}
+.ctrl.red .lab{color:#F09A94}
+.ctrl p{margin:0;font-size:14px}
+.tablewrap{overflow-x:auto;margin:0 0 14px;border:1px solid var(--line);border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--shark);font-weight:400;background:var(--panel)}
+tbody tr:nth-child(even){background:rgba(232,234,239,.022)}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--prism);color:#fff;border:0;border-radius:4px;font-family:var(--display);font-stretch:118%;font-weight:600;font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:12px 18px;cursor:pointer}
+.btn:hover{background:#6444FF}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--frost)}
+.btn.ghost:hover{border-color:var(--prism);background:var(--prism-soft)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.scorechip{font-family:var(--mono);font-size:12px;color:var(--frost);padding:6px 10px;border:1px solid var(--line);border-radius:4px;font-variant-numeric:tabular-nums}
+.scorechip:empty{display:none}
+.msg{font-size:14px;margin:12px 0 0}
+.msg:empty{display:none}
+.good{color:#A8DFC6}
+.risk{color:#F2B9B9}
+.docstrip{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:40px;padding-top:12px;border-top:1px solid var(--line);font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--shark)}
+.docstrip .pg{margin-left:auto;color:var(--frost)}
+.pagenav{display:flex;gap:10px;flex-wrap:wrap;margin-top:34px}
+
+/* ---------- feed ---------- */
+.feed{background:#020306;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:0 0 16px}
+.feedhead{display:flex;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--shark)}
+.feedrow{display:grid;grid-template-columns:78px minmax(0,1fr);gap:12px;padding:10px 14px;border-bottom:1px solid #101219;font-size:14px}
+.feedrow:last-child{border-bottom:0}
+.feedrow .t{font-family:var(--mono);font-size:11.5px;color:var(--amber);font-variant-numeric:tabular-nums;padding-top:1px}
+.feedrow .lvs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.feedrow.enter{animation:rise .35s ease}
+@keyframes rise{from{opacity:.2;transform:translateY(4px)}to{opacity:1;transform:none}}
+.feedrow.now{background:rgba(224,169,59,.07)}
+.feedrow.now .t{color:var(--frost)}
+.feedrow.end{background:var(--prism-soft)}
+.feedrow.end .t{color:var(--prism-lift)}
+
+/* ---------- 1 · switchboard ---------- */
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:6px 0 16px}
+.chan{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;border-radius:6px;padding:14px 14px 12px;cursor:pointer;background:var(--panel-2);border:1px solid var(--line);transition:box-shadow .2s,border-color .2s,background .2s;min-width:0}
+.chan .num{font-family:var(--display);font-stretch:125%;font-weight:800;font-size:30px;line-height:1}
+.chan .nm{font-family:var(--display);font-stretch:112%;font-weight:600;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;line-height:1.25}
+.chan .by{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--shark)}
+.chan .lamp{position:absolute;top:14px;right:14px;width:10px;height:10px;border-radius:50%;background:var(--panel-3);border:1px solid var(--line)}
+.chan.c1 .num{color:var(--shark)}
+.chan.c2 .num{color:var(--frost)}
+.chan.c3 .num{color:#8B74FF}
+.chan.c4 .num{color:var(--prism-lift)}
+.chan.c5 .num{color:#F07A72}
+.chan.c6 .num{background:linear-gradient(100deg,#fff,var(--prism-lift));-webkit-background-clip:text;background-clip:text;color:transparent}
+.chan.lit{border-color:var(--frost);background:var(--panel-3)}
+.chan.lit .lamp{background:var(--good);border-color:var(--good);box-shadow:0 0 10px 2px rgba(79,178,134,.55)}
+.chan.c5.lit{border-color:var(--sbar);background:rgba(192,51,43,.14)}
+.chan.c5.lit .lamp{background:#FF5A4F;border-color:#FF5A4F;box-shadow:0 0 12px 3px rgba(255,90,79,.6)}
+.chan[aria-expanded="true"]{box-shadow:0 0 0 2px var(--ink),0 0 0 4px var(--prism-lift)}
+.boardfoot{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--shark);margin:-6px 0 0}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:0 0 16px}
+.facts div{background:var(--panel-2);padding:10px 12px;font-size:13.5px;min-width:0}
+.facts span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--shark);margin-bottom:3px}
+.detail .head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.detail .head .ttl{font-family:var(--display);font-stretch:118%;font-weight:700;font-size:19px;text-transform:uppercase;letter-spacing:.05em}
+.twocol{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.twocol .ctrl{margin:0}
+
+/* ---------- 2 · pulldowns ---------- */
+.pdrow{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:8px 14px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line-soft)}
+.pdrow:last-child{border-bottom:0}
+.pdrow label{font-size:14.5px}
+.pdrow .fb{grid-column:1/-1;font-size:13px;margin:0}
+select{appearance:none;-webkit-appearance:none;background:var(--panel-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2392989B'/%3E%3C/svg%3E") no-repeat right 12px center;border:1px solid var(--line);border-radius:4px;color:var(--frost);font-family:var(--mono);font-size:12.5px;padding:9px 32px 9px 12px;width:100%;cursor:pointer}
+select:hover{border-color:var(--prism)}
+.pdrow.ok select{border-color:var(--good);background-color:var(--good-soft)}
+.pdrow.no select{border-color:var(--bad);background-color:var(--bad-soft)}
+
+/* ---------- 3 · night board (drag and drop) ---------- */
+.tray{border:1px dashed var(--line);border-radius:6px;padding:12px;background:var(--panel);margin:0 0 12px}
+.trayhead{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--shark)}
+.chiplist{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;min-height:44px}
+.chip{display:inline-flex;align-items:center;gap:8px;border-radius:4px;padding:8px 12px;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;border:1px solid var(--line);background:var(--panel-3)}
+.chip::before{content:"";width:6px;height:12px;flex:0 0 auto;background:radial-gradient(circle,currentColor 1px,transparent 1.4px) 0 0/3px 4px;opacity:.55}
+.chip.l1{border-color:var(--shark)}
+.chip.l2{border-color:var(--frost);background:rgba(232,234,239,.08)}
+.chip.l3{background:var(--prism);border-color:var(--prism);color:#fff}
+.chip.l4{border-color:var(--prism-lift);color:var(--prism-lift);background:var(--prism-soft)}
+.chip.l5{background:var(--sbar);border-color:var(--sbar);color:#fff}
+.chip.l6{background:linear-gradient(110deg,#000 0%,var(--prism-deep) 42%,var(--prism) 100%);border-color:var(--prism-lift);color:#fff}
+.chip.sel{box-shadow:0 0 0 2px var(--ink),0 0 0 4px var(--prism-lift)}
+.chip.ok{box-shadow:0 0 0 2px var(--ink),0 0 0 4px var(--good);cursor:default}
+.chip.no{box-shadow:0 0 0 2px var(--ink),0 0 0 4px var(--bad)}
+.chip.lifting{opacity:.3}
+.nightrow{display:grid;grid-template-columns:62px minmax(0,1fr) 150px;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid #101219}
+.nightrow:last-child{border-bottom:0}
+.nightrow .t{font-family:var(--mono);font-size:11.5px;color:var(--amber);font-variant-numeric:tabular-nums}
+.nightrow .x{font-size:14px}
+.slot{display:flex;align-items:center;justify-content:center;min-height:44px;border:1px dashed var(--line);border-radius:5px;background:var(--panel);padding:4px;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.slot .ph{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--shark)}
+.armed .slot{border-color:var(--prism-lift)}
+.armed .slot .ph{color:var(--prism-lift)}
+.slot.filled{border-style:solid;border-color:var(--line-soft)}
+.over{border-color:var(--prism-lift)!important;box-shadow:0 0 0 2px var(--prism-lift),0 0 26px rgba(81,47,255,.35)!important}
+.dragghost{position:fixed;left:0;top:0;z-index:200;pointer-events:none;opacity:.94;box-shadow:0 14px 32px rgba(0,0,0,.55);margin:0}
+
+/* ---------- 4 · case files ---------- */
+.scorebar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:6px;background:var(--panel);margin:0 0 16px}
+.pips{display:flex;gap:5px;flex-wrap:wrap}
+.pip{width:20px;height:6px;border-radius:2px;background:var(--panel-3);border:1px solid var(--line)}
+.pip.cur{background:var(--prism-soft);border-color:var(--prism-lift)}
+.pip.ok{background:var(--good);border-color:var(--good)}
+.pip.no{background:var(--bad);border-color:var(--bad)}
+.sb{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--shark)}
+.sb b{font-family:var(--display);font-stretch:118%;font-size:15px;color:var(--frost);letter-spacing:.04em;margin-left:4px;font-variant-numeric:tabular-nums}
+.sb.rank{margin-left:auto}
+.sb.rank b{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--prism-lift)}
+.casecard{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:0 0 16px}
+.casehead{padding:16px 18px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(81,47,255,.07),transparent)}
+.casemeta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.caseno{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--shark)}
+.kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;padding:2px 7px;border-radius:3px}
+.kind.news{border:1px solid var(--frost);color:var(--frost)}
+.kind.gotham{border:1px dashed var(--amber);color:var(--amber)}
+.casetitle{color:var(--frost);font-family:var(--display);font-stretch:118%;font-weight:700;font-size:clamp(19px,2.8vw,24px);text-transform:uppercase;letter-spacing:.03em;line-height:1.15;margin:0 0 8px;text-wrap:balance}
+.where{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--prism-lift);margin:0 0 6px}
+.client{font-size:14px;margin:0}
+.casebody{padding:16px 18px}
+.hook{border:1px solid var(--line);border-radius:5px;padding:11px 14px;margin:0 0 16px;background:var(--panel-2);font-size:13.5px}
+.hook .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--shark);display:block;margin-bottom:4px}
+.hook p{margin:0 0 6px}
+.hook .links{font-size:12px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.q{font-weight:600;font-size:15px;margin:4px 0 12px}
+.droprow{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.handle{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px dashed var(--prism-lift);border-radius:6px;background:var(--prism-soft);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.handle .folder{width:30px;height:22px;flex:0 0 auto;position:relative;border-radius:2px 3px 3px 3px;background:var(--prism)}
+.handle .folder::before{content:"";position:absolute;left:0;top:-5px;width:13px;height:6px;border-radius:2px 2px 0 0;background:var(--prism)}
+.handle .ht{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+.handle .hs{font-size:12.5px;color:var(--shark);display:block;font-family:var(--sans);letter-spacing:0;text-transform:none}
+.handle.lifting{opacity:.35}
+.handle.spent{display:none}
+.pads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pad{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;border-radius:6px;padding:13px 14px;min-height:84px;cursor:pointer;transition:transform .12s,box-shadow .15s;min-width:0;border:1px solid var(--line);background:var(--panel-2);color:var(--frost)}
+.pad:hover:not(:disabled){transform:translateY(-1px)}
+.pad .pn{font-family:var(--display);font-stretch:125%;font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase}
+.pad .pt{font-size:12.5px;opacity:.85;line-height:1.3}
+.pad.p1{border-color:var(--shark)}
+.pad.p2{border-color:var(--frost);background:rgba(232,234,239,.07)}
+.pad.p3{background:var(--prism);border-color:var(--prism);color:#fff}
+.pad.p4{border-color:var(--prism-lift);background:var(--prism-soft)}
+.pad.p5{background:var(--sbar);border-color:var(--sbar);color:#fff}
+.pad.p6{background:linear-gradient(110deg,#000 0%,var(--prism-deep) 40%,var(--prism) 100%);border-color:var(--prism-lift);color:#fff}
+.pad:disabled{cursor:default;opacity:.32}
+.pad.right{opacity:1;box-shadow:0 0 0 2px var(--ink),0 0 0 4px var(--good)}
+.pad.wrong{opacity:1;box-shadow:0 0 0 2px var(--ink),0 0 0 4px var(--bad)}
+.pad .mark{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-top:auto;padding-top:5px}
+.verdict{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
+.verdict .vt{font-family:var(--display);font-stretch:118%;font-weight:700;font-size:16px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px}
+.tell{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--prism-line);border-radius:5px;background:var(--prism-soft);margin:0 0 12px}
+.tell .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--prism-lift)}
+.tell span:last-child{font-weight:600}
+.alsolive{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}
+.alsolive .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--shark);margin-right:4px}
+
+@media (max-width:860px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 41px);z-index:40;height:auto;display:flex;gap:4px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px 0;background:rgba(5,6,10,.96);padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+  .railgroup{display:none}
+  .navitem{width:auto;flex:0 0 auto;white-space:nowrap;border-left:0;border-bottom:2px solid transparent;padding:8px 10px;font-size:12.5px}
+  .navitem.on{border-bottom-color:var(--prism)}
+  main{padding-block:22px 90px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .cropmark,.docid{display:none}
+}
+@media (max-width:620px){
+  .board,.pads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .facts{grid-template-columns:minmax(0,1fr)}
+  .pdrow{grid-template-columns:minmax(0,1fr)}
+  .nightrow{grid-template-columns:52px minmax(0,1fr)}
+  .nightrow .slot{grid-column:2}
+  .feedrow{grid-template-columns:62px minmax(0,1fr);font-size:13.5px}
+  .sb.rank{margin-left:0}
+  .chan .num{font-size:26px}
+}
+</style>
+
+<svg class="cropmark" viewBox="0 0 100 92" aria-hidden="true"><path d="M50 11 L89 79 L11 79 Z" fill="none" stroke="currentColor" stroke-width="15" stroke-linejoin="round"/></svg>
+
+<header class="topbar">
+  <svg class="trio" viewBox="0 0 100 92" aria-hidden="true"><path d="M50 11 L89 79 L11 79 Z" fill="none" stroke-width="16" stroke-linejoin="round"/></svg>
+  <div class="wordmark">Specialized</div>
+  <div class="docid">GSOC · Escalation Levels · Companion to SOP-GSOC-000 A6</div>
+  <div class="clock"><span class="pulse"></span><span id="clock">--:--:--</span></div>
+  <div class="progbar" id="progbar"></div>
+</header>
+
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Module sections"></nav>
+  <main id="main">
+
+<!-- ============ 00 BRIEFING ============ -->
+<section class="page" id="p0" data-nav="Briefing" data-group="Start">
+  <div class="cover">
+    <svg class="covermark" viewBox="0 0 100 92" aria-hidden="true"><path d="M50 11 L89 79 L11 79 Z" fill="none" stroke="currentColor" stroke-width="15" stroke-linejoin="round"/></svg>
+    <div class="wordmark frost">Specialized</div>
+    <p class="eyebrow">GSOC operator training · Escalation framework</p>
+    <h1>Name the level</h1>
+    <p class="tag">Six levels, two rules, one bad night at a rental yard and ten case files. Half the cases come from this year's news. The rest involve Gotham's finest, who are apparently on tour.</p>
+    <div class="rule"></div>
+    <p class="kv">Companion to SOP-GSOC-000, Section A6 · v0.1 Draft · Internal, operational</p>
+  </div>
+
+  <div class="statgrid">
+    <div class="stat"><b>6</b><span>Levels</span></div>
+    <div class="stat"><b>2</b><span>Rules over all six</span></div>
+    <div class="stat"><b>12</b><span>Trigger drills</span></div>
+    <div class="stat"><b>10</b><span>Case files</span></div>
+  </div>
+
+  <div class="card takeaway">
+    <div class="brandbar"><i></i><i></i><i></i></div>
+    <h3>The thing to remember</h3>
+    <p class="bigline">Levels are categories of action. You don't climb them in order, and more than one can be live at the same time.</p>
+    <p style="margin:0">A Level 3 dispatch has Level 2 running beside it. A fire goes straight to Level 5, and Level 6 can stack on top by morning. When you escalate, say it out loud: "Level 5, Level 2 in parallel."</p>
+  </div>
+
+  <h2>The two rules over all six</h2>
+  <div class="ctrl red"><span class="lab">Rule 1 · Life safety</span><p>A life-safety event goes straight to Level 5. You never work your way up to it, and you never wait for the Supervisor to answer before you make that call.</p></div>
+  <div class="ctrl"><span class="lab">Rule 2 · Failed escalations</span><p>If an escalation can't be completed because nobody answers or the channel's down, that failure gets escalated one level up right away. An unanswered call doesn't count as a discharged obligation.</p></div>
+
+  <h2>How this runs</h2>
+  <p>Open the switchboard and play each level's example. Watch which channels light up together, because that's the whole point. Then run the pulldowns and the night board until they feel boring, and take the case files. One shot each.</p>
+  <div class="pagenav"><button class="btn" data-go="1">Open the switchboard</button></div>
+</section>
+
+<!-- ============ 01 SWITCHBOARD ============ -->
+<section class="page" id="p1" data-nav="The switchboard" data-group="Learn" hidden>
+  <p class="eyebrow">Part 1 · Reveal</p>
+  <h1>The switchboard</h1>
+  <p class="subline">Tap a level to open it, then play the example. The lamps show every level that's live at each moment, so you can see them run together.</p>
+  <div class="board" id="board"></div>
+  <p class="boardfoot">Green lamp = live right now. Red is the emergency channel.</p>
+  <div class="card detail" id="lvDetail" style="margin-top:16px"></div>
+
+  <h2>Who owns which call</h2>
+  <div class="twocol">
+    <div class="ctrl"><span class="lab">The operator</span><p>Levels 1, 2, 3 and 5. Level 5 happens immediately, with the Supervisor and client notified in parallel, never first.</p></div>
+    <div class="ctrl"><span class="lab">Above the operator</span><p>Level 4 is the Supervisor's call to the client. Level 6 belongs to the Program Director, and Kyle owns that path. Your job is to get it to them fast, with the facts ready.</p></div>
+  </div>
+  <div class="pagenav"><button class="btn ghost" data-go="0">Back</button><button class="btn" data-go="2">Pulldown drills</button></div>
+</section>
+
+<!-- ============ 02 PULLDOWNS ============ -->
+<section class="page" id="p2" data-nav="Pulldown drills" data-group="Drill" hidden>
+  <p class="eyebrow">Part 2 · Pulldowns</p>
+  <h1>Call it cold</h1>
+  <p class="subline">Two drills. First, who actions each level. Then twelve one-line events, and you name the level each one enters at.</p>
+
+  <h2>Who actions it?</h2>
+  <div class="card">
+    <div id="byRows"></div>
+    <div class="btnrow"><button class="btn" id="byCheck">Check</button><button class="btn ghost" id="byClear">Clear</button><span class="scorechip" id="byScore"></span></div>
+    <p class="msg" id="byMsg"></p>
+  </div>
+
+  <h2>Match the trigger</h2>
+  <div class="card">
+    <div id="trRows"></div>
+    <div class="btnrow"><button class="btn" id="trCheck">Check</button><button class="btn ghost" id="trClear">Clear</button><span class="scorechip" id="trScore"></span></div>
+    <p class="msg" id="trMsg"></p>
+  </div>
+  <div class="pagenav"><button class="btn ghost" data-go="1">Back</button><button class="btn" data-go="3">The night board</button></div>
+</section>
+
+<!-- ============ 03 NIGHT BOARD ============ -->
+<section class="page" id="p3" data-nav="The night board" data-group="Drill" hidden>
+  <p class="eyebrow">Part 3 · Drag and drop</p>
+  <h1>One night at Yard 9</h1>
+  <p class="subline">Equipment rental yard, Denton, Texas. Six moments from one shift. Drag the level that each moment calls for onto its slot. Every level gets used once, and notice they don't come in order. On a phone, tap a level, then tap the slot.</p>
+  <div class="tray" id="tray" data-drop="tray"><div class="trayhead">Levels · <span id="trayCount">6</span> left</div><div class="chiplist" id="trayList"></div></div>
+  <div class="feed" id="nightFeed"><div class="feedhead">Yard 9 · incident timeline</div></div>
+  <div class="btnrow">
+    <button class="btn" id="nightCheck">Check the board</button>
+    <button class="btn ghost" id="nightBack" hidden>Send misses back</button>
+    <button class="btn ghost" id="nightReset">Start over</button>
+    <span class="scorechip" id="nightScore"></span>
+  </div>
+  <p class="msg" id="nightMsg"></p>
+  <div class="pagenav"><button class="btn ghost" data-go="2">Back</button><button class="btn" data-go="4">Open the case files</button></div>
+</section>
+
+<!-- ============ 04 CASE FILES ============ -->
+<section class="page" id="p4" data-nav="Case files" data-group="Test" hidden>
+  <p class="eyebrow">Part 4 · Scenarios</p>
+  <h1>Case files</h1>
+  <p class="subline">Ten incidents, each stopped at the moment you have to decide. Drag the file onto the level that moment calls for, or tap the level. The reveal shows what else is live beside it. One shot each.</p>
+  <div class="scorebar">
+    <div class="pips" id="pips" aria-label="Case progress"></div>
+    <span class="sb">Score<b id="cScore">0/10</b></span>
+    <span class="sb">Streak<b id="cStreak">0</b></span>
+    <span class="sb rank">Rank<b id="cRank">Unranked</b></span>
+  </div>
+  <div id="caseHost"></div>
+</section>
+
+<!-- ============ 05 DEBRIEF ============ -->
+<section class="page" id="p5" data-nav="Debrief" data-group="Wrap" hidden>
+  <p class="eyebrow">Part 5 · Debrief</p>
+  <h1>Debrief</h1>
+  <p class="subline" id="dbLine">Finish the case files and your rank lands here.</p>
+  <div class="statgrid" id="dbStats"></div>
+
+  <h2>Carry these onto the floor</h2>
+  <div class="card takeaway">
+    <div class="brandbar"><i></i><i></i><i></i></div>
+    <ul style="margin:0">
+      <li><b>Say the level out loud.</b> "Level 3, Level 2 in parallel." If you can't name it, that's a Level 2 by itself.</li>
+      <li><b>Life safety skips the line.</b> Person down, fire, weapon, an officer who's gone quiet. Level 5 first, everyone else in parallel.</li>
+      <li><b>Unsure goes up.</b> It's never a disposition. Level 2 is where unsure goes.</li>
+      <li><b>An unanswered call isn't done.</b> A dead phone or a dead network gets escalated one level up, right away, with every attempt timed in the record.</li>
+      <li><b>Know whose call it is.</b> Level 4 is the Supervisor's. Level 6 is the Program Director's. You get it to them with the facts ready.</li>
+    </ul>
+  </div>
+
+  <h2>Quick reference</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th style="width:170px">Level</th><th>Trigger</th><th style="width:140px">Actioned by</th><th style="width:200px">Notify</th></tr></thead>
+    <tbody id="refBody"></tbody>
+  </table></div>
+
+  <h2>Your case files</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th style="width:40px">#</th><th>Case</th><th style="width:100px">You said</th><th style="width:110px">Answer</th><th>The tell</th></tr></thead>
+    <tbody id="sumBody"></tbody>
+  </table></div>
+  <div class="btnrow"><button class="btn ghost" id="caseReset">Run the case files again</button></div>
+
+  <h2>Open confirmations</h2>
+  <ul class="small">
+    <li><span class="confirm">[CONFIRM]</span> Where a property crime in progress sits when nobody is at risk. A6 lists "crime in progress" as a Level 5 trigger, but the Level 3 example has a subject loading a cart. This module teaches that what moves it to Level 5 is a person at risk, a weapon, fire or a medical emergency.</li>
+    <li><span class="confirm">[CONFIRM]</span> What "one level up" means for a failed Level 2 or Level 4. SOP-GSOC-010 only spells it out for dispatch, where it goes to Level 2.</li>
+    <li><span class="confirm">[CONFIRM]</span> Expected officer report-back interval (SOP-GSOC-010). Case 10 uses ten minutes as a placeholder.</li>
+    <li><span class="confirm">[CONFIRM]</span> TRN document number for this module.</li>
+  </ul>
+
+  <h2>News behind the case files</h2>
+  <p class="small muted">Case details are built for training and the clients are invented. The events and numbers come from these reports.</p>
+  <ul class="small" id="srcList"></ul>
+
+  <div class="pagenav"><button class="btn ghost" data-go="4">Back to case files</button><button class="btn ghost" data-go="0">Back to the start</button></div>
+</section>
+
+  </main>
+</div>
+
+<script>
+/* ============================ data ============================ */
+const LV={
+  1:{name:'Monitor and document',trig:'Alert received. Non-actionable, or still being assessed.',by:'Operator',notify:'Incident record only'},
+  2:{name:'Supervisor notification',trig:'Ambiguity, an alert surge, doubt about the procedure, or repeat activity at one site.',by:'Operator',notify:'Program Supervisor'},
+  3:{name:'Direct-to-guard dispatch',trig:'Verified, actionable, and nobody’s life is at risk.',by:'Operator',notify:'On-site officer, plus the Supervisor'},
+  4:{name:'Client and management notification',trig:'The event crosses the notification threshold in the Program Annex.',by:'Supervisor',notify:'Client escalation contact'},
+  5:{name:'Emergency response',trig:'Life-safety threat, crime in progress, fire, or a medical emergency.',by:'Operator, immediately',notify:'Police or EMS on the site’s local dispatch number from the annex, then Supervisor and client in parallel'},
+  6:{name:'Executive notification',trig:'Fatality or serious injury, media exposure, a multi-site event, a major service failure, or regulatory contact.',by:'Program Director',notify:'Client executives and Specialized leadership'}
+};
+
+const EX={
+  1:{site:'Distribution center',beats:[
+      {t:'0130',x:'Motion alert, north lot.',live:[1]},
+      {t:'0130',x:'Operator pulls the live view. A deer is crossing the north lot.',live:[1]},
+      {t:'0131',x:'He logs the specific cause, “deer crossing north lot, camera 2,” and completes the record.',live:[1]}],
+     end:'Writing “false alarm” doesn’t count. QA looks for that.'},
+  2:{site:'Monitored site, one tower',beats:[
+      {t:'0302',x:'The same tower throws three motion alerts in ninety seconds, all in one zone.',live:[1]},
+      {t:'0303',x:'The live view isn’t clear enough to call it. The operator can’t classify it with confidence.',live:[1]},
+      {t:'0303',x:'It goes to Toy for a determination.',live:[2]}],
+     end:'“Unsure” isn’t an allowed disposition. Level 2 is where unsure goes.'},
+  3:{site:'Fenced equipment yard',beats:[
+      {t:'0218',x:'Two subjects in the yard. One is loading a cart, the other is watching the fence line. No weapon seen.',live:[1]},
+      {t:'0219',x:'Officer dispatched with a full brief: location, two subjects, no weapon observed, one acting as lookout.',live:[3,2]},
+      {t:'0219',x:'He’s told to hold at the gatehouse instead of going in alone.',live:[3,2]}],
+     end:'Level 2 runs alongside the dispatch the whole time.'},
+  4:{site:'Same yard, after the dispatch',beats:[
+      {t:'0251',x:'The officer walks the yard and finds a cut fence and two missing generators.',live:[3,2]},
+      {t:'0253',x:'The client’s annex says any verified theft gets reported.',live:[2]},
+      {t:'0255',x:'The Supervisor calls the client’s regional contact from the matrix.',live:[4]}],
+     end:'The Supervisor makes this call, not the operator.'},
+  5:{site:'Store entrance',beats:[
+      {t:'0407',x:'One person on the ground at the store entrance, not moving. Someone is standing over him.',live:[5]},
+      {t:'0407',x:'The operator calls the site’s local dispatch number from the annex right away.',live:[5]},
+      {t:'0407',x:'He notifies the Supervisor at the same time, and doesn’t wait for the Supervisor to answer.',live:[5,2]}],
+     end:'This is the one people fail most in training, usually because they’re trying to follow the chain of command.'},
+  6:{site:'Distribution center',beats:[
+      {t:'Night',x:'Fire at a distribution center. Level 5 goes out the moment it’s verified.',live:[5,2]},
+      {t:'Night',x:'An employee is seriously injured.',live:[5,6]},
+      {t:'Morning',x:'A news crew is outside the gate.',live:[6]},
+      {t:'Morning',x:'Level 6 puts it in front of both companies’ leadership. The Program Director owns that call.',live:[6]}],
+     end:'Level 5 handles the emergency. Level 6 handles who needs to know at the top.'}
+};
+
+const TRIG=[
+  {q:'A raccoon crosses the dock apron. Nothing else on any camera.',a:1,why:'An animal with no security relevance. Log the specific cause and close it.'},
+  {q:'A person is on the ground at the store entrance, not moving.',a:5,why:'Life safety. Call it in now and notify the Supervisor in parallel.'},
+  {q:'You can’t tell whether the shape behind the dumpster is a person.',a:2,why:'Unsure isn’t a disposition. Level 2 is where unsure goes.'},
+  {q:'A news crew is outside the gate asking about last night’s break-in.',a:6,why:'Media exposure is a Level 6 trigger. The Program Director owns it.'},
+  {q:'One subject inside a fenced yard working a padlock. No weapon seen, nobody else around.',a:3,why:'Verified, actionable, nobody at risk. Dispatch with a full brief.'},
+  {q:'Both the officer’s phone and the alternate go unanswered on a dispatch.',a:2,why:'A failed dispatch goes up right away. SOP-GSOC-010 sends it to Level 2.'},
+  {q:'Smoke showing from a trailer at the dock.',a:5,why:'Fire is a Level 5 trigger by name.'},
+  {q:'The officer confirms a trailer was stolen, and the annex says any verified theft gets reported.',a:4,why:'The threshold is met. The Supervisor calls the client contact.'},
+  {q:'An alert surge across six sites during a windstorm.',a:2,why:'A surge is a named Level 2 trigger. The Supervisor helps you triage.'},
+  {q:'The officer you dispatched hasn’t reported back and isn’t answering.',a:5,why:'Officer welfare is treated as life safety under SOP-GSOC-010.'},
+  {q:'The same zone at one site has alerted three nights running.',a:2,why:'Repeat activity at one site is a Level 2 trigger.'},
+  {q:'A state regulator calls the client about an overnight incident.',a:6,why:'Regulatory contact is a Level 6 trigger.'}
+];
+const BY_OPTS=['Operator','Supervisor','Program Director'];
+const BY_KEY={1:'Operator',2:'Operator',3:'Operator',4:'Supervisor',5:'Operator',6:'Program Director'};
+const BY_WHY={1:'You work it and the record is the only notification.',2:'You raise it to the Program Supervisor.',3:'You dispatch the officer and tell the Supervisor.',4:'The Supervisor makes this call, not you.',5:'You, immediately. Nobody else first.',6:'The Program Director. Kyle owns this path.'};
+
+const NIGHT=[
+  {t:'2350',x:'Motion alert, east fence. Live view: a doe and two fawns. Logged as “deer crossing east fence, camera 3.”',a:1},
+  {t:'0112',x:'Two subjects inside the fence stripping copper off a generator. One is watching the road. No weapon seen. The officer gets a full brief and holds at the gatehouse.',a:3},
+  {t:'0119',x:'The officer’s headlights hit the lookout. He pulls a knife and starts walking toward the truck.',a:5},
+  {t:'0155',x:'Police leave with one in custody. The officer walks the yard: cut fence, generator stripped. This client’s annex says any verified theft gets reported.',a:4},
+  {t:'0305',x:'Camera 4 got knocked crooked in the scuffle. The same zone throws four alerts in two minutes and you can’t see enough to call it.',a:2},
+  {t:'0650',x:'A TV news van parks at the gate asking about “the knife fight at the rental yard.”',a:6}
+];
+const NIGHT_WHY={1:'Deer, specific cause, record closed.',3:'Verified, nobody at risk yet, officer held at the gatehouse.',5:'A knife and a person in the way. Level 5, now.',4:'Verified theft meets the annex threshold. Supervisor calls the client.',2:'Repeat alerts you can’t classify. Unsure goes up.',6:'Media at the gate. Program Director.'};
+
+const SRC={
+  wind:{label:'Alaska Public Media: Tens of thousands without power as high wind slams Southcentral (Oct 30, 2026)',url:'https://alaskapublic.org/news/public-safety/2026-10-30/tens-of-thousands-without-power-in-anchorage-and-mat-su-as-high-wind-slams-southcentral'},
+  sig:{label:'FreightWaves: $500,000 SIG Sauer shipment stolen in fictitious pickup (Oct 2026)',url:'https://www.freightwaves.com/?p=584457'},
+  overhaul:{label:'FreightWaves: Overhaul Q1 2026 cargo theft report',url:'https://www.freightwaves.com/?p=573171'},
+  fire:{label:'WIS: Lithium batteries could spark more fires at Spartanburg warehouse (Jun 6, 2026)',url:'https://www.wistv.com/2026/06/06/its-just-mess-officials-say-lithium-batteries-could-spark-more-fires-spartanburg-warehouse/'},
+  vz:{label:'NBC Palm Springs: Verizon outage disrupts calls and data nationwide (Jan 14, 2026)',url:'https://www.nbcpalmsprings.com/2026/01/14/verizon-wireless-outage-disrupts-calls-and-data-for-customers-nationwide'},
+  ring:{label:'WJLA: 6 arrested in alleged $500K retail theft ring across DC region and several states (Aug 2026)',url:'https://wjla.com/news/local/story/6-arrested-alleged-500k-retail-theft-ring-across-dc-maryland-virginia-pennsylvania-delaware-prince-georges-county'}
+};
+
+const CASES=[
+ {kind:'gotham',title:'Killer Croc at the retention pond',where:'Orlando, FL',
+  client:'Regional beverage distributor. A stormwater pond sits behind the south lot.',
+  beats:[['0131','Motion alert, south berm, camera 6.'],
+         ['0131','Live view: something long and low hauls itself out of the retention pond. Somebody on the floor yells “Killer Croc.”'],
+         ['0132','Optical and thermal across cameras 5 and 6: it’s a nine-foot alligator. Nobody else in view anywhere on the lot.']],
+  q:'It slides back into the water. What level is this?',
+  a:1,also:[],tell:'Non-actionable, with the specific cause on the record.',
+  why:'An animal with no security relevance is Level 1. You work it yourself, and the incident record is the only notification. The record says “alligator leaving retention pond, south berm, camera 6.” It doesn’t say “false alarm,” and it definitely doesn’t say “Killer Croc.”',
+  high:'Nothing here is ambiguous and nobody is at risk. Sending it up costs the Supervisor time without giving them anything to decide.',
+  note:'If an officer walks that berm on rounds, put the gator in the passdown so nobody meets it at 0400.'},
+
+ {kind:'gotham',title:'Catwoman on the roof',where:'Phoenix, AZ',
+  client:'Jewelry wholesaler’s warehouse. One officer posted at the gatehouse.',
+  beats:[['0244','Motion alert, roof hatch, camera 11.'],
+         ['0244','Verified: one subject in black on the roof, working the hatch lock with a small tool. No weapon seen.'],
+         ['0245','Nobody else is on site except your officer at the gatehouse. Right now the only thing at risk is a lock.']],
+  q:'What level does this call for?',
+  a:3,also:[2],tell:'Verified, actionable, nobody at risk. Dispatch with a full brief.',
+  why:'Level 3. Brief the officer in order: roof hatch, one subject, no weapon observed, working the lock. Say “no weapon observed,” because that’s different from “no weapon.” Tell him to watch the ladder from the ground instead of climbing up after her. The Supervisor hears about it alongside.',
+  high:'Level 5 is for a threat to a person, a fire or a medical emergency. A lone subject on a roof with nobody near her is a Level 3 with a good brief. If she pulls something, or the officer gets hurt, it flips in a second.',
+  low:'This is verified and actionable. Logging it and watching isn’t enough.'},
+
+ {kind:'news',title:'Forty alerts in six minutes',where:'Anchorage, AK',
+  client:'Fuel distributor with five yards in Anchorage and the Mat-Su.',
+  hook:'High wind slammed Southcentral Alaska on October 30, 2026. Forecasters called for gusts up to 80 mph, and more than 47,000 customers lost power that morning as trees came down on lines.',
+  src:['wind'],
+  beats:[['0412','Wind picks up. Motion alerts start stacking across all five yards. Flags, tarps, a loose fence panel.'],
+         ['0415','Forty alerts in six minutes. Two towers drop offline as the power goes.'],
+         ['0416','You can’t verify them as fast as they’re coming in, and two sites have no view at all.']],
+  q:'What level is this, right now?',
+  a:2,also:[1],tell:'An alert surge, plus two towers you can’t see through.',
+  why:'An alert surge is a named Level 2 trigger. The Supervisor needs it now, to triage the queue with you and decide on degraded operations for the dark towers. Grinding through forty alerts one at a time at Level 1 feels diligent, but you’re already behind.',
+  note:'Keep working the queue while you wait. Anything that could be life safety goes first, then site criticality. The two dead towers get logged with site IDs and times.'},
+
+ {kind:'gotham',title:'Bane at the gatehouse',where:'Denver, CO',
+  client:'Building supply yard with one on-site officer.',
+  beats:[['0407','Gate alert. Live view: a very large man in a mask lifts the rolling gate clean off its track.'],
+         ['0407','The site officer is on the ground beside the gatehouse. He isn’t moving. The big man walks off toward the lumber shed.'],
+         ['0407','Your hand goes to the phone to call Toy.']],
+  q:'Your instinct is to call Toy first. What level do you actually go to?',
+  a:5,also:[2],tell:'Person down. Level 5, right now.',
+  why:'An officer on the ground and not moving is a life-safety event, so it goes straight to Level 5. Call the site’s local dispatch number from the annex for police and EMS. Toy gets notified in parallel. You never wait for the Supervisor to answer before you make that call.',
+  low:'This is the one people fail most, and they fail it while trying to follow the chain of command. Every second spent on the phone tree ends up in the record with a timestamp.'},
+
+ {kind:'news',title:'The truck that wasn’t theirs',where:'Ontario, CA',
+  client:'Third-party warehouse with a staffed gatehouse. The annex says any verified theft gets reported.',
+  hook:'Deceptive pickups, where thieves pose as a real carrier, were up 31% year over year in Overhaul’s Q1 2026 report. In October, Los Angeles County deputies announced arrests over roughly $500,000 in SIG Sauer products taken in a fictitious warehouse pickup.',
+  src:['overhaul','sig'],
+  beats:[['0210','A tractor pulls up with paperwork. The gate officer checks it and lets it in. It hooks a loaded trailer of televisions.'],
+         ['0228','It leaves. Nothing on camera looked wrong.'],
+         ['0355','The gate officer calls in. The carrier says they never sent a truck. You pull the footage and confirm the trailer left at 0228. Nobody was hurt and the truck is long gone.']],
+  q:'The theft is verified. What level does it hit?',
+  a:4,also:[2],tell:'A verified theft that meets the annex threshold.',
+  why:'This client’s annex says any verified theft gets reported, so this is Level 4. The Supervisor makes that call to the client’s escalation contact from the matrix. Your part is getting it to the Supervisor with the times and the footage reference ready.',
+  low:'Level 2 is part of the path, since you’re handing it to the Supervisor. But the annex threshold is what decides this one, and the client call is the Supervisor’s.',
+  high:'Nothing is in progress and nobody is in danger, so this isn’t Level 5.'},
+
+ {kind:'gotham',title:'Clayface on the loading apron',where:'Columbus, OH',
+  client:'Grocery distribution center.',
+  beats:[['0231','Motion alert, loading apron, zone C.'],
+         ['0231','Another. Then another. Three in ninety seconds, all in zone C.'],
+         ['0232','Live view: a wet gray heap by dock door 4. It might be a tarp. It might be a person crouching. Then it looks like a tarp again.']],
+  q:'You can’t call it with confidence. What level?',
+  a:2,also:[1],tell:'Unsure goes to the Supervisor.',
+  why:'Repeat alerts in one zone and a view you can’t classify. That’s ambiguity, and ambiguity is Level 2. “Unsure” isn’t an allowed disposition. Toy makes the determination while you keep eyes on.',
+  low:'Closing it at Level 1 means you wrote down a guess. If that tarp turns out to be a person, it’s your name on the record.',
+  note:'If it had looked like a person on the ground, the rule flips. When verification is inconclusive and a life-safety outcome is plausible, you escalate it as life safety (SOP-GSOC-007).'},
+
+ {kind:'news',title:'Smoke in the battery cage',where:'Greenville, SC',
+  client:'E-commerce returns warehouse that stores returned electronics.',
+  hook:'In June 2026 a Spartanburg, South Carolina warehouse burned for the second time in a week. The fire marshal said stored lithium batteries had already exploded and the building wasn’t built to hold them. Crews were there for more than three hours, until the batteries burned out.',
+  src:['fire'],
+  beats:[['0318','Thermal alert, returns cage, camera 14.'],
+         ['0318','Live view: a white haze rising off a pallet of returned laptops. The hot spot on thermal is growing.'],
+         ['0319','The site officer is on the far side of the building doing rounds.']],
+  q:'What level is this?',
+  a:5,also:[2],tell:'Fire. Straight to Level 5.',
+  why:'Fire is a Level 5 trigger by name. Call the site’s fire dispatch number from the annex now, with the Supervisor and client notified in parallel. Point the officer to the gate to meet the engine. Don’t send him into a lithium fire with an extinguisher.',
+  low:'Sending the officer to “go take a look” before you call it in is the trap here. A battery fire doesn’t wait for a second opinion.'},
+
+ {kind:'news',title:'Dispatch with no bars',where:'Dallas, TX',
+  client:'Equipment rental yard. The officer is reached by cell, and the alternate is a push-to-talk app.',
+  hook:'On January 14, 2026, a Verizon outage knocked out calls and data across the country, and Dallas was among the hardest-hit cities. Some phones dropped to SOS mode, and Downdetector logged more than a million reports.',
+  src:['vz'],
+  beats:[['1124','Motion alert, back lot. Verified: one subject on foot, walking the equipment rows. No weapon seen, nobody at risk. You go to dispatch.'],
+         ['1125','You call the officer’s cell. Fast busy.'],
+         ['1125','You try the alternate right away, the push-to-talk app. It rides the same network. Nothing.']],
+  q:'Both dispatch methods failed. What level now?',
+  a:2,also:[3],tell:'A failed escalation goes up, right away.',
+  why:'An unanswered call doesn’t discharge anything. When the primary and the alternate are both unreachable, SOP-GSOC-010 says escalate to Level 2 immediately and record every attempt with its time. That’s what “one level up” looks like for a dispatch. The Supervisor can work another route to get someone to that lot.',
+  low:'Level 3 isn’t finished just because you tried. Writing “officer unreachable” and moving on leaves a trespasser walking the yard with nobody coming.',
+  high:'Nobody is at risk, so this isn’t Level 5 yet. If the subject goes after someone, it is.'},
+
+ {kind:'news',title:'Three stores, one crew',where:'Maryland and Virginia',
+  client:'Tool and hardware chain with stores across the Mid-Atlantic.',
+  hook:'In August 2026, police arrested six people in a retail theft ring they say hit more than 100 businesses across D.C., Maryland, Virginia, Pennsylvania and Delaware, taking over $500,000 in tools, clothing and other goods.',
+  src:['ring'],
+  beats:[['0112','Hagerstown store. Rear door forced, three subjects carrying boxed power tools out to a gray SUV. Each store gets its own response.'],
+         ['0207','Frederick store. Same gray SUV, same three, same rear door.'],
+         ['0319','Leesburg store. The gray SUV again.']],
+  q:'It’s 0320 and the same crew has now hit three of this client’s stores tonight. What level does that add?',
+  a:6,also:[2,4],tell:'A multi-site event.',
+  why:'Each store got its own response. Three stores in one night by the same crew is a multi-site event, and that’s a Level 6 trigger. The Program Director owns that call to the client’s executives and Specialized leadership. Kyle owns this path. Your part is making sure the Supervisor sees the pattern the moment it’s a pattern.',
+  low:'Level 4 may already have gone out for each store under the annex threshold. Level 6 is a different call, to a different audience, made by a different person.'},
+
+ {kind:'gotham',title:'Scarecrow and the quiet radio',where:'Lubbock, TX',
+  client:'Seasonal decor warehouse, still packing up Halloween returns.',
+  beats:[['0226','Verified: one subject in a burlap mask wandering the trailer rows. No weapon seen. Officer dispatched with a full brief.'],
+         ['0231','The officer reports in at the trailer rows, then walks around the back of row D, out of every camera.'],
+         ['0241','No report back. You call his radio. Nothing. His phone rings out. The masked guy is nowhere in view either.']],
+  q:'Your officer isn’t answering and you can’t see him. What level?',
+  a:5,also:[2],tell:'Officer welfare is life safety.',
+  why:'An officer who doesn’t report back and won’t answer is treated as a potential life-safety matter under SOP-GSOC-010. That’s Level 5. Get police rolling to row D on the annex dispatch number and notify the Supervisor in parallel. If he turns out to be fine, nobody will ever criticize you for it.',
+  low:'Level 2 feels reasonable because nothing is confirmed. But over-escalation is recoverable and under-escalation isn’t, and an unanswered radio isn’t a discharged obligation.',
+  note:'He was fine. Scarecrow had left a speaker playing creepy laughter behind row D, and the officer had stepped on his own radio. Nobody on the floor said a word about the Level 5, which is exactly how it should go.'}
+];
+
+/* ============================ helpers ============================ */
+const $=s=>document.querySelector(s);
+const LVB=n=>`<span class="lv l${n}">Level ${n}</span>`;
+const LVBN=n=>`<span class="lv l${n}">Level ${n} · ${LV[n].name}</span>`;
+const S={page:0,done:new Set(),opened:new Set(),byFirst:null,trFirst:null,nightFirst:null,ci:0,ans:[]};
+function tick(){const d=new Date();$('#clock').textContent=[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':')+' LOCAL';}
+setInterval(tick,1000);tick();
+
+/* ---------- pointer drag for mouse, pen and touch ---------- */
+function dropAt(x,y){const n=document.elementFromPoint(x,y);return n?n.closest('[data-drop]'):null;}
+function makeDraggable(el,enabled,onDrop){
+  el.addEventListener('pointerdown',e=>{
+    if(!enabled())return;
+    if(e.pointerType==='mouse'&&e.button!==0)return;
+    const r=el.getBoundingClientRect(),ox=e.clientX-r.left,oy=e.clientY-r.top,sx=e.clientX,sy=e.clientY,pid=e.pointerId;
+    let ghost=null,over=null;
+    try{el.setPointerCapture(pid)}catch(_){}
+    const move=ev=>{
+      if(ev.pointerId!==pid)return;
+      if(!ghost){
+        if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<6)return;
+        ghost=el.cloneNode(true);ghost.removeAttribute('id');ghost.classList.add('dragghost');ghost.classList.remove('sel');
+        ghost.style.width=r.width+'px';document.body.appendChild(ghost);
+        el.classList.add('lifting');document.body.classList.add('dragging');
+      }
+      ev.preventDefault();
+      ghost.style.transform=`translate(${ev.clientX-ox}px,${ev.clientY-oy}px) rotate(-2deg)`;
+      const t=dropAt(ev.clientX,ev.clientY);
+      if(t!==over){over&&over.classList.remove('over');over=t;over&&over.classList.add('over');}
+    };
+    const end=ev=>{
+      if(ev.pointerId!==pid)return;
+      el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',end);el.removeEventListener('pointercancel',end);
+      if(!ghost)return;
+      ghost.remove();el.classList.remove('lifting');document.body.classList.remove('dragging');
+      over&&over.classList.remove('over');el._dragEnd=performance.now();
+      const t=ev.type==='pointerup'?dropAt(ev.clientX,ev.clientY):null;
+      if(t)onDrop(t);
+    };
+    el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
+  });
+}
+const justDragged=el=>el._dragEnd&&performance.now()-el._dragEnd<400;
+
+/* ============================ router ============================ */
+const PAGES=[...document.querySelectorAll('.page')];
+function paintRail(){
+  const rail=$('#rail');rail.innerHTML='';let g=null;
+  PAGES.forEach((p,i)=>{
+    if(p.dataset.group!==g){g=p.dataset.group;const d=document.createElement('div');d.className='railgroup';d.textContent=g;rail.appendChild(d);}
+    const b=document.createElement('button');
+    b.className='navitem'+(i===S.page?' on':'')+(S.done.has(i)?' done':'');
+    b.innerHTML=`<span class="n">${String(i).padStart(2,'0')}</span><span>${p.dataset.nav}</span>`;
+    if(i===S.page)b.setAttribute('aria-current','page');
+    b.onclick=()=>go(i);rail.appendChild(b);
+  });
+  $('#progbar').style.width=(S.done.size/PAGES.length*100)+'%';
+}
+function done(i){if(!S.done.has(i)){S.done.add(i);paintRail();}}
+function go(i){
+  S.page=i;PAGES.forEach((p,j)=>p.hidden=j!==i);
+  if(i===0||i===5)done(i);
+  if(i===5)paintDebrief();
+  paintRail();window.scrollTo({top:0,behavior:'smooth'});
+  const on=document.querySelector('.navitem.on');on&&on.scrollIntoView&&on.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)go(+b.dataset.go);});
+PAGES.forEach((p,i)=>{
+  const s=document.createElement('div');s.className='docstrip';
+  s.innerHTML=`<span>Specialized GSOC</span><span>Escalation levels</span><span>SOP-GSOC-000 A6 companion</span><span>v0.1 Draft</span><span class="pg">${String(i).padStart(2,'0')} / ${String(PAGES.length-1).padStart(2,'0')}</span>`;
+  p.appendChild(s);
+});
+
+/* ============================ 1 · switchboard ============================ */
+function light(levels){for(let k=1;k<=6;k++)$('#chan'+k).classList.toggle('lit',levels.includes(k));}
+function buildBoard(){
+  const b=$('#board');
+  for(let k=1;k<=6;k++){
+    const c=document.createElement('button');
+    c.className='chan c'+k;c.id='chan'+k;c.setAttribute('aria-expanded','false');c.setAttribute('aria-controls','lvDetail');
+    c.innerHTML=`<span class="lamp" aria-hidden="true"></span><span class="num">${k}</span><span class="nm">${LV[k].name}</span><span class="by">${LV[k].by}</span>`;
+    c.onclick=()=>openLevel(k);b.appendChild(c);
+  }
+  openLevel(1);
+}
+function openLevel(k){
+  S.opened.add(k);
+  for(let j=1;j<=6;j++)$('#chan'+j).setAttribute('aria-expanded',String(j===k));
+  const ex=EX[k];
+  $('#lvDetail').innerHTML=`
+    <div class="head">${LVBN(k)}</div>
+    <div class="facts">
+      <div><span>Trigger</span>${LV[k].trig}</div>
+      <div><span>Actioned by</span>${LV[k].by}</div>
+      <div><span>Notify</span>${LV[k].notify}</div>
+    </div>
+    <h3>Watch it play out · ${ex.site}</h3>
+    <div class="feed"><div class="feedhead">SOP-GSOC-000 A6 example · Level ${k}</div><div id="exRows"></div></div>
+    <div class="btnrow" style="margin-top:0"><button class="btn" id="exNext">Next beat</button><button class="btn ghost" id="exAll">Show it all</button></div>`;
+  let i=0;const rows=$('#exRows');
+  const step=()=>{
+    if(i<ex.beats.length){const b=ex.beats[i++];
+      rows.insertAdjacentHTML('beforeend',`<div class="feedrow enter"><div class="t">${b.t}</div><div>${b.x}<div class="lvs">${b.live.map(LVB).join('')}<span class="muted small" style="align-self:center">live</span></div></div></div>`);
+      light(b.live);}
+    if(i>=ex.beats.length&&!rows.querySelector('.end')){rows.insertAdjacentHTML('beforeend',`<div class="feedrow end enter"><div class="t">Note</div><div><b>${ex.end}</b></div></div>`);$('#exNext').disabled=true;$('#exAll').disabled=true;}
+  };
+  step();
+  $('#exNext').onclick=step;
+  $('#exAll').onclick=()=>{while(!rows.querySelector('.end'))step();};
+  if(S.opened.size===6)done(1);
+}
+
+/* ============================ 2 · pulldowns ============================ */
+function pulldownSet(cfg){
+  const host=$(cfg.host);
+  host.innerHTML=cfg.rows.map((r,i)=>`
+    <div class="pdrow" id="${cfg.id}r${i}">
+      <label for="${cfg.id}s${i}">${r.label}</label>
+      <select id="${cfg.id}s${i}"><option value="">Pick one</option>${cfg.opts.map(o=>`<option value="${o.v}">${o.t}</option>`).join('')}</select>
+      <p class="fb" id="${cfg.id}f${i}" hidden></p>
+    </div>`).join('');
+  $(cfg.check).onclick=()=>{
+    const blank=cfg.rows.filter((r,i)=>!$(`#${cfg.id}s${i}`).value).length;
+    if(blank){$(cfg.msg).innerHTML=`<span class="risk">${blank} still on “Pick one.” Answer every row, then check.</span>`;return;}
+    let n=0;
+    cfg.rows.forEach((r,i)=>{
+      const v=$(`#${cfg.id}s${i}`).value,ok=v===String(r.a),row=$(`#${cfg.id}r${i}`),fb=$(`#${cfg.id}f${i}`);
+      row.classList.toggle('ok',ok);row.classList.toggle('no',!ok);if(ok)n++;
+      fb.hidden=false;fb.className='fb '+(ok?'good':'risk');
+      fb.innerHTML=(ok?'Right. ':`It’s ${cfg.label(r.a)}. `)+r.why;
+    });
+    if(S[cfg.first]===null)S[cfg.first]=n;
+    $(cfg.score).textContent=`${n} / ${cfg.rows.length}`;
+    $(cfg.msg).innerHTML=n===cfg.rows.length?'<span class="good">Clean sheet.</span>':`${cfg.rows.length-n} to fix. Change the red ones and check again.`;
+    if(n===cfg.rows.length)cfg.onClean();
+  };
+  $(cfg.clear).onclick=()=>{
+    cfg.rows.forEach((r,i)=>{$(`#${cfg.id}s${i}`).value='';$(`#${cfg.id}r${i}`).classList.remove('ok','no');$(`#${cfg.id}f${i}`).hidden=true;});
+    $(cfg.score).textContent='';$(cfg.msg).innerHTML='';
+  };
+}
+let byClean=false,trClean=false;
+function buildPulldowns(){
+  pulldownSet({host:'#byRows',id:'by',check:'#byCheck',clear:'#byClear',score:'#byScore',msg:'#byMsg',first:'byFirst',
+    rows:[3,6,1,4,5,2].map(k=>({label:`${LVB(k)} ${LV[k].name}`,a:BY_KEY[k],why:BY_WHY[k]})),
+    opts:BY_OPTS.map(o=>({v:o,t:o})),label:a=>a==='Operator'?'the operator':'the '+a,
+    onClean:()=>{byClean=true;if(trClean)done(2);}});
+  pulldownSet({host:'#trRows',id:'tr',check:'#trCheck',clear:'#trClear',score:'#trScore',msg:'#trMsg',first:'trFirst',
+    rows:TRIG.map(t=>({label:t.q,a:t.a,why:t.why})),
+    opts:[1,2,3,4,5,6].map(k=>({v:String(k),t:`Level ${k} · ${LV[k].name}`})),label:a=>`Level ${a}`,
+    onClean:()=>{trClean=true;if(byClean)done(2);}});
+}
+
+/* ============================ 3 · night board ============================ */
+const slotOf={};let selChip=null;
+function buildNight(){
+  const feed=$('#nightFeed');
+  NIGHT.forEach((b,i)=>{
+    feed.insertAdjacentHTML('beforeend',`<div class="nightrow"><div class="t">${b.t}</div><div class="x">${b.x}<p class="small fb" id="nf${i}" hidden style="margin:6px 0 0"></p></div><div class="slot" id="slot${i}" data-drop="s${i}" role="button" tabindex="0" aria-label="Level slot for ${b.t}"><span class="ph">Drop level</span></div></div>`);
+  });
+  [5,2,6,1,4,3].forEach(k=>{
+    const c=document.createElement('button');c.className='chip l'+k;c.id='chip'+k;c.dataset.k=k;c.textContent='Level '+k;
+    makeDraggable(c,()=>!c.classList.contains('ok'),t=>placeChip(k,t.dataset.drop));
+    c.addEventListener('click',e=>{
+      e.stopPropagation();
+      if(justDragged(c)||c.classList.contains('ok'))return;
+      if(selChip===k){selChip=null;c.classList.remove('sel');}
+      else{document.querySelectorAll('.chip.sel').forEach(x=>x.classList.remove('sel'));selChip=k;c.classList.add('sel');}
+      $('#p3').classList.toggle('armed',!!selChip);
+    });
+    slotOf[k]='tray';$('#trayList').appendChild(c);
+  });
+  NIGHT.forEach((b,i)=>{const s=$('#slot'+i);s.addEventListener('click',()=>{if(selChip)placeChip(selChip,'s'+i);});s.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target===s){e.preventDefault();if(selChip)placeChip(selChip,'s'+i);}});});
+  $('#tray').addEventListener('click',e=>{if(e.target.closest('.chip'))return;if(selChip)placeChip(selChip,'tray');});
+  $('#nightCheck').onclick=checkNight;
+  $('#nightBack').onclick=()=>{for(let k=1;k<=6;k++){const c=$('#chip'+k);if(c.classList.contains('no')){c.classList.remove('no');placeChip(k,'tray');}}$('#nightBack').hidden=true;$('#nightMsg').innerHTML='Misses are back in the tray. Try them again.';};
+  $('#nightReset').onclick=()=>{for(let k=1;k<=6;k++){const c=$('#chip'+k);c.classList.remove('ok','no','sel');placeChip(k,'tray');}NIGHT.forEach((b,i)=>$('#nf'+i).hidden=true);S.nightFirst=null;selChip=null;$('#nightBack').hidden=true;$('#nightScore').textContent='';$('#nightMsg').innerHTML='';};
+}
+function placeChip(k,dest){
+  const c=$('#chip'+k);c.classList.remove('sel','no');selChip=null;$('#p3').classList.remove('armed');
+  if(dest!=='tray'){
+    const i=+dest.slice(1),slot=$('#slot'+i);
+    const prev=Object.keys(slotOf).find(x=>slotOf[x]===dest&&+x!==k);
+    if(prev){const pc=$('#chip'+prev);if(pc.classList.contains('ok'))return;pc.classList.remove('no');slotOf[prev]='tray';$('#trayList').appendChild(pc);}
+    slot.querySelector('.ph')&&slot.querySelector('.ph').remove();
+    slot.appendChild(c);slot.classList.add('filled');
+  }else{$('#trayList').appendChild(c);}
+  slotOf[k]=dest;
+  NIGHT.forEach((b,i)=>{const s=$('#slot'+i);if(!s.querySelector('.chip')){s.classList.remove('filled');if(!s.querySelector('.ph'))s.innerHTML='<span class="ph">Drop level</span>';}});
+  $('#trayCount').textContent=Object.values(slotOf).filter(v=>v==='tray').length;
+}
+function checkNight(){
+  const left=Object.values(slotOf).filter(v=>v==='tray').length;
+  if(left){$('#nightMsg').innerHTML=`<span class="risk">${left} still in the tray. Place every level, then check.</span>`;return;}
+  let n=0,miss=0;
+  NIGHT.forEach((b,i)=>{
+    const k=+Object.keys(slotOf).find(x=>slotOf[x]==='s'+i),c=$('#chip'+k),fb=$('#nf'+i);
+    if(k===b.a){c.classList.add('ok');n++;fb.hidden=false;fb.className='small fb good';fb.textContent=NIGHT_WHY[b.a];}
+    else{c.classList.add('no');miss++;fb.hidden=true;}
+  });
+  if(S.nightFirst===null)S.nightFirst=n;
+  $('#nightScore').textContent=`First try: ${S.nightFirst} / 6`;
+  if(miss){$('#nightBack').hidden=false;$('#nightMsg').innerHTML=`${n} of 6 right. The red ones are on the wrong moment. Send them back and try again.`;}
+  else{$('#nightBack').hidden=true;$('#nightMsg').innerHTML='<span class="good">Board’s right. Look at the order: 1, 3, 5, 4, 2, 6. That’s a normal bad night.</span>';done(3);}
+}
+
+/* ============================ 4 · case files ============================ */
+function rank(n){
+  if(n>=10)return 'World’s greatest dispatcher';
+  if(n>=8)return 'Watch commander';
+  if(n>=6)return 'Shift lead material';
+  if(n>=4)return 'Console operator';
+  return 'Still on the phone tree';
+}
+function rankLine(n){
+  if(n>=10)return 'Ten for ten. Gordon would put you on the roof with the light.';
+  if(n>=8)return 'You’d run this floor fine. Look over the miss and you’re there.';
+  if(n>=6)return 'Solid. Go back through the misses, they usually share one trap.';
+  if(n>=4)return 'The basics are in. Run the switchboard and the night board again, then retake the cases.';
+  return 'Play every example on the switchboard with the lamps in view, then come back. It clicks fast.';
+}
+function scoreState(){let sc=0,streak=0;S.ans.forEach((a,i)=>{if(a===CASES[i].a){sc++;streak++;}else streak=0;});return {sc,streak,n:S.ans.length};}
+function paintScore(){
+  const {sc,streak,n}=scoreState();
+  $('#cScore').textContent=`${sc}/10`;$('#cStreak').textContent=streak;
+  $('#cRank').textContent=n===10?rank(sc):(n?rank(Math.round(sc/n*10)):'Unranked');
+  $('#pips').innerHTML=CASES.map((c,i)=>{const a=S.ans[i];return `<span class="pip${a===undefined?(i===S.ci?' cur':''):(a===c.a?' ok':' no')}" title="Case ${i+1}"></span>`;}).join('');
+}
+function renderCase(){
+  const i=S.ci,c=CASES[i];
+  const hook=c.hook?`<div class="hook"><span class="lab">In the news</span><p>${c.hook}</p><div class="links">${c.src.map(k=>`<a href="${SRC[k].url}" target="_blank" rel="noopener">${SRC[k].label}</a>`).join('')}</div></div>`:'';
+  const last=c.beats.length-1;
+  $('#caseHost').innerHTML=`
+  <article class="casecard">
+    <div class="casehead">
+      <div class="casemeta"><span class="caseno">CASE ${String(i+1).padStart(2,'0')} / 10</span><span class="kind ${c.kind}">${c.kind==='news'?'News file':'Gotham file'}</span></div>
+      <h3 class="casetitle">${c.title}</h3>
+      <p class="where">${c.where}</p>
+      <p class="client">${c.client}</p>
+    </div>
+    <div class="casebody">
+      ${hook}
+      <div class="feed"><div class="feedhead">Incident timeline</div>${c.beats.map(([t,x],j)=>`<div class="feedrow${j===last?' now':''}"><div class="t">${t}</div><div>${x}</div></div>`).join('')}</div>
+      <p class="q">${c.q}</p>
+      <div class="droprow">
+        <div class="handle" id="handle"><span class="folder" aria-hidden="true"></span><span class="ht">Case ${String(i+1).padStart(2,'0')} · Drag me to a level<span class="hs">Or just tap the level.</span></span></div>
+        <div class="pads">${[1,2,3,4,5,6].map(k=>`<button class="pad p${k}" data-drop="${k}" data-pad="${k}"><span class="pn">Level ${k}</span><span class="pt">${LV[k].name}</span><span class="mark"></span></button>`).join('')}</div>
+      </div>
+      <div class="verdict" id="verdict" hidden></div>
+    </div>
+  </article>`;
+  makeDraggable($('#handle'),()=>S.ans[i]===undefined,t=>t.dataset.pad&&answer(+t.dataset.pad));
+  document.querySelectorAll('.pad').forEach(p=>p.onclick=()=>answer(+p.dataset.pad));
+  paintScore();
+}
+function answer(k){
+  const i=S.ci,c=CASES[i];if(S.ans[i]!==undefined)return;
+  S.ans[i]=k;const ok=k===c.a;
+  document.querySelectorAll('.pad').forEach(p=>{
+    const v=+p.dataset.pad;p.disabled=true;
+    if(v===c.a){p.classList.add('right');p.querySelector('.mark').textContent=ok?'Your pick ✓':'Answer';}
+    else if(v===k){p.classList.add('wrong');p.querySelector('.mark').textContent='Your pick';}
+  });
+  $('#handle').classList.add('spent');
+  let extra='';
+  if(!ok&&k<c.a&&c.low)extra=`<p class="risk small">${c.low}</p>`;
+  if(!ok&&k>c.a&&c.high)extra=`<p class="risk small">${c.high}</p>`;
+  if(!ok&&!extra)extra=`<p class="risk small">Level ${k} is real, but it isn’t what this moment calls for. Look at what’s actually in front of you at the last line of the timeline.</p>`;
+  const lastCase=i===CASES.length-1;
+  const v=$('#verdict');v.hidden=false;
+  v.innerHTML=`
+    <p class="vt ${ok?'good':'risk'}">${ok?'Correct. '+LVB(c.a):'Not this time. It’s '+LVB(c.a)}</p>
+    <div class="tell"><span class="lab">The tell</span><span>${c.tell}</span></div>
+    ${c.also.length?`<div class="alsolive"><span class="lab">Also live</span>${c.also.map(LVB).join('')}</div>`:`<div class="alsolive"><span class="lab">Also live</span><span class="small muted">Nothing else. Level 1 stands alone here.</span></div>`}
+    <p>${c.why}</p>${extra}${c.note?`<p class="small muted">${c.note}</p>`:''}
+    <div class="btnrow"><button class="btn" id="nextCase">${lastCase?'See your debrief':'Next case'}</button></div>`;
+  $('#nextCase').onclick=()=>{if(lastCase){done(4);go(5);}else{S.ci++;renderCase();$('#p4').scrollIntoView({behavior:'smooth',block:'start'});}};
+  paintScore();
+  v.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ============================ 5 · debrief ============================ */
+function paintDebrief(){
+  const {sc,n}=scoreState();
+  $('#dbLine').textContent=n===10?`${rank(sc)}. ${rankLine(sc)}`:(n?`You’re ${n} cases in. Finish all ten and your rank locks in here.`:'Finish the case files and your rank lands here.');
+  const f=(v,of)=>v===null?'··':`${v}/${of}`;
+  $('#dbStats').innerHTML=`
+    <div class="stat"><b>${n?sc+'/'+n:'··'}</b><span>Case files</span></div>
+    <div class="stat"><b>${f(S.byFirst,6)}</b><span>Who actions it, first check</span></div>
+    <div class="stat"><b>${f(S.trFirst,12)}</b><span>Triggers, first check</span></div>
+    <div class="stat"><b>${f(S.nightFirst,6)}</b><span>Night board, first try</span></div>`;
+  $('#sumBody').innerHTML=CASES.map((c,i)=>{const a=S.ans[i];return `<tr><td class="mono">${String(i+1).padStart(2,'0')}</td><td>${c.title}</td><td>${a===undefined?'<span class="muted">Not yet</span>':`<span class="${a===c.a?'good':'risk'}">Level ${a}</span>`}</td><td>${LVB(c.a)}</td><td class="small">${c.tell}</td></tr>`;}).join('');
+}
+function buildDebriefStatic(){
+  $('#refBody').innerHTML=[1,2,3,4,5,6].map(k=>`<tr><td>${LVB(k)}<br><span class="small">${LV[k].name}</span></td><td class="small">${LV[k].trig}</td><td class="small">${LV[k].by}</td><td class="small">${LV[k].notify}</td></tr>`).join('');
+  $('#srcList').innerHTML=Object.values(SRC).map(s=>`<li><a href="${s.url}" target="_blank" rel="noopener">${s.label}</a></li>`).join('');
+  $('#caseReset').onclick=()=>{S.ans=[];S.ci=0;renderCase();paintDebrief();go(4);};
+}
+
+/* ============================ boot ============================ */
+buildBoard();buildPulldowns();buildNight();renderCase();buildDebriefStatic();go(0);
+</script>
